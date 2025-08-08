@@ -24,15 +24,15 @@ gantt
     section EPIC-2: Approvals & Automation (Weeks 5-6)
     US-7: Admin Approval        :crit, after US-5, 5d
     US-8: Notifications         :after US-7, 5d
-    US-10: E-Approval           :crit, 7d
-    US-9: Document Scanning     :10d
+    US-10: E-Approval           :crit, after US-7, 7d
+    US-9: Document Scanning     :after US-5, 10d
 
     section EPIC-3: AI Integration (Weeks 7-8)
-    TS-12: Setup Query Engine   :crit, 4d
+    TS-12: Setup Query Engine   :crit, after US-8, 4d
     US-14: Advanced Query      :after TS-12, 4d
     US-11: Chatbot Integration  :after TS-12, 7d
-    US-13: Smart Form Filling  :5d
-    US-12: AI Agents            :crit, 10d
+    US-13: Smart Form Filling  :after TS-12, 5d
+    US-12: AI Agents            :crit, after TS-12, 10d
 ```
 
 ## 2. Milestone Definitions
