@@ -1,0 +1,1006 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wf0-initiation",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "23aaae37-f330-4ddf-b962-0d49243bc90c",
+      "name": "Webhook Trigger",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [
+        -2080,
+        160
+      ],
+      "webhookId": "{{WEBHOOK_ID}}",
+      "notes": "POST to: https://your-n8n.com/webhook/wf0-initiation\nBody: {\"sourceType\": \"jira\", \"sourceId\": \"PROJ-123\"}"
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate unique TraceID and validate input\nconst timestamp = Date.now();\nconst randomId = Math.random().toString(36).substring(7);\nconst traceId = `wf0-${timestamp}-${randomId}`;\n\n// Get input from webhook body\nconst webhookData = $input.first().json.body || $input.first().json;\nconst sourceType = webhookData.sourceType || 'jira';\nconst sourceId = webhookData.sourceId || '';\n\nif (!sourceId) {\n  throw new Error('sourceId is required. Please provide a Jira issue key');\n}\n\n// Validate sourceType\nif (!['jira', 'confluence'].includes(sourceType)) {\n  throw new Error('sourceType must be either \"jira\" or \"confluence\"');\n}\n\nconsole.log(`Starting WF-0 with TraceID: ${traceId}`);\nconsole.log(`Source: ${sourceType} - ${sourceId}`);\n\nreturn {\n  traceId,\n  sourceType,\n  sourceId,\n  startTime: new Date().toISOString(),\n  workflowVersion: '2.1.0-webhook',\n  webhookHeaders: $input.first().json.headers || {}\n};"
+      },
+      "id": "56897d0b-b155-4767-b552-efb0f9f99cd1",
+      "name": "Generate TraceID",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1888,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "issueKey": "={{ $json.sourceId }}",
+        "additionalFields": {}
+      },
+      "id": "647766f9-9ae1-4558-92f8-9c031b74f8ee",
+      "name": "Fetch Source Content",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        -1696,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "RgVehemDtsefy49r",
+          "name": "Tekcent Jira"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "getAll",
+        "options": {
+          "jql": "project = TPLUSDEV AND type = Epic ORDER BY created DESC"
+        }
+      },
+      "id": "d2b1ec00-7b7f-45de-98fd-de2677fab4a6",
+      "name": "Fetch Existing Epics",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        -1488,
+        144
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "RgVehemDtsefy49r",
+          "name": "Tekcent Jira"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Merge source content and existing epics\nconst sourceContent = $('Fetch Source Content').first().json;\nconst existingEpics = $('Fetch Existing Epics').all() || [];\nconst traceId = $input.all()[0].json.traceId;\n\n// Check if source fetch failed\nif (sourceContent.error) {\n  throw new Error(`Failed to fetch source: ${sourceContent.error}`);\n}\n\nconst contextPackage = {\n  traceId,\n  sourceContent: {\n    key: sourceContent.key,\n    summary: sourceContent.fields?.summary || 'No summary',\n    description: sourceContent.fields?.description || '',\n    issueType: sourceContent.fields?.issuetype?.name || 'Unknown'\n  },\n  existingEpics: Array.isArray(existingEpics) ? existingEpics.map(epic => ({\n    key: epic.json.key,\n    summary: epic.json.fields?.summary,\n    description: epic.json.fields?.description\n  })) : []\n};\n\nreturn contextPackage;"
+      },
+      "id": "ad318acb-cdff-429d-9f25-6676e90dad69",
+      "name": "Prepare Duplicate Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1312,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Existing epics:\n{{ JSON.stringify($json.existingEpics?.map(issue => ({id: issue.key, summary: issue.summary, description: issue.description})) || [], null, 2) }}\n\nDetermine if existing epics is a duplicate or very similar to content from the requirement: {{ $json.sourceContent.summary }}\n{{ $json.sourceContent.description }}",
+        "options": {
+          "systemMessage": "You are an AI assistant that performs semantic duplicate detection.\n\nAnalyze the source content and existing epics to detect duplicates.\nCalculate semantic similarity considering:\n1. Business objectives overlap\n2. Functionality similarity\n3. Technical scope overlap\n\nReturn JSON:\n{\n  \"isDuplicate\": true/false,\n  \"similarity_score\": 0.0-1.0,\n  \"most_similar_epic\": \"EPIC-KEY\" or null,\n  \"reasoning\": \"explanation\",\n  \"confidence_score\": 0.0-1.0\n}\n\nSet isDuplicate=true if similarity_score > 0.8"
+        }
+      },
+      "id": "b2497577-ec02-408b-a123-fa92cc75f118",
+      "name": "AI: Duplicate Check",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -1104,
+        144
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {}
+      },
+      "id": "c2563a04-bb84-4623-a3a4-2cebf862e056",
+      "name": "Gemini Model (Duplicate)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        320
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SNgTsD0A58tT944v",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse duplicate check response\nconst rawText = $input.first().json.output;\nconst context = $input.first().json;\n\nif (!rawText || typeof rawText !== 'string') {\n  return { isDuplicate: false, similarity_score: 0, confidence_score: 0 };\n}\n\nconst startIndex = rawText.indexOf('{');\nconst endIndex = rawText.lastIndexOf('}');\n\nif (startIndex !== -1 && endIndex !== -1) {\n  try {\n    const parsed = JSON.parse(rawText.substring(startIndex, endIndex + 1));\n    return {\n      ...parsed,\n      traceId: context.traceId,\n      sourceContent: context.sourceContent\n    };\n  } catch (error) {\n    console.log('Parse error:', error);\n    return { isDuplicate: false, similarity_score: 0 };\n  }\n}\nreturn { isDuplicate: false, similarity_score: 0 };"
+      },
+      "id": "d8ed83b3-7a79-477f-985d-43af7b0b2393",
+      "name": "Parse Duplicate Check",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -720,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// HITL notification for duplicate\nconst data = $input.first().json;\n\nreturn {\n  status: 'HITL_REQUIRED',\n  reason: 'DUPLICATE_DETECTED',\n  traceId: data.traceId,\n  message: `Duplicate detected with ${data.most_similar_epic}. Similarity: ${data.similarity_score}`,\n  action_required: 'Review and confirm if this should proceed as new work'\n};"
+      },
+      "id": "53ce7fdb-0b76-4b9f-bfe0-12afd97ba63d",
+      "name": "HITL: Duplicate Notification",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        32
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare context for combined planning agent\nconst data = $('Prepare Duplicate Context').first().json;\n\nconst planningContext = {\n  traceId: data.traceId,\n  requirement: {\n    key: data.sourceContent.key,\n    title: data.sourceContent.summary,\n    description: data.sourceContent.description,\n    type: data.sourceContent.issueType\n  },\n  timestamp: new Date().toISOString()\n};\n\nconsole.log('Preparing for combined planning agent...');\nreturn planningContext;"
+      },
+      "id": "6241a295-4771-4759-953d-0edbbda48fc7",
+      "name": "Prepare Planning Context",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -304,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=# INPUT REQUIREMENT\nTitle: {{ $json.requirement.title }}\nDescription: {{ $json.requirement.description }}",
+        "options": {
+          "systemMessage": "You are a comprehensive Project Planning Agent combining Product Owner, Solution Architect, and QA perspectives.\n\n# YOUR MISSION\nAnalyze the requirement and create a complete project plan including epics, user stories, technical stories, and test scenarios.\n\n# PLANNING APPROACH\n## 1. EPIC PLANNING\n- Create 1-3 epics representing major feature areas\n- Each epic should be a coherent business capability\n- Each Epic needs:\n-- Clear epic summary (what major capability it delivers)\n-- Epic description (why it's valuable, who benefits)\n-- Success criteria (how we know the epic is complete)\n-- Estimated timeline (how many sprints)\n\n## 2. USER STORY PLANNING\n- Break each epic into 3-8 user stories\n- Format: \"As a [role], I want to [action], so that [value]\"\n- Include 2+ acceptance criteria per story\n- Assign story points (1,2,3,5,8,13)\n- Set priority within Epic context (1/2/3/4/5)\n\n## 3. TECHNICAL PLANNING\n- For each epic, identify technical foundations needed\n- Categories: foundation, integration, performance, security, devops\n- Include sub-tasks with hour estimates\n\n## 4. TEST PLANNING\n- Create BDD scenarios for epic-level journeys\n- Use Gherkin format (Given/When/Then)\n- Include happy path and edge cases\n\n# OUTPUT FORMAT\nReturn a single JSON object:\n\n{\n  \"status\": \"success\",\n  \"confidence_score\": 0.0-1.0,\n  \"planning_summary\": {\n    \"total_epics\": number,\n    \"total_stories\": number,\n    \"total_points\": number,\n    \"estimated_sprints\": number\n  },\n  \"epics\": [\n    {\n      \"id\": \"epic-1\",\n      \"summary\": \"Epic title\",\n      \"description\": \"Epic description\",\n      \"business_value\": 1-100,\n      \"success_criteria\": [\"Criteria 1\"],\n      \"priority\": \"3\",\n      \"user_stories\": [\n        {\n          \"id\": \"story-1-1\",\n          \"summary\": \"Story title\",\n          \"description\": \"As a..., I want..., so that...\",\n          \"acceptance_criteria\": [\"AC1\", \"AC2\"],\n          \"story_points\": 3,\n          \"priority\": \"3\"\n        }\n      ],\n      \"technical_stories\": [\n        {\n          \"id\": \"tech-1-1\",\n          \"summary\": \"Technical story title\",\n          \"category\": \"foundation\",\n          \"description\": \"Technical capability\",\n          \"enables_stories\": [\"story-1-1\"],\n          \"sub_tasks\": [\n            {\n              \"title\": \"Task title\",\n              \"estimated_hours\": 4\n            }\n          ],\n          \"risk_level\": \"low\"\n        }\n      ],\n      \"test_scenarios\": [\n        {\n          \"id\": \"test-1-1\",\n          \"type\": \"story\",\n          \"scenario_name\": \"Test scenario\",\n          \"gherkin\": \"Given...\\nWhen...\\nThen...\"\n        }\n      ]\n    }\n  ],\n  \"questions\": []\n}"
+        }
+      },
+      "id": "40fdc087-6586-4413-b8a2-8d0a22f7fb56",
+      "name": "🎯 Combined Planning Agent",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2.1,
+      "position": [
+        -112,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "modelName": "models/gemini-2.0-flash",
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "20b008ca-7a85-46fd-bf15-5d65a9af92f7",
+      "name": "Gemini Model (Planning)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        -112,
+        400
+      ],
+      "credentials": {
+        "googlePalmApi": {
+          "id": "SNgTsD0A58tT944v",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse combined planning output\nconst rawText = $input.first().json.output;\nconst context = $('Prepare Planning Context').first().json;\n\nif (!rawText || typeof rawText !== 'string') {\n  throw new Error('Invalid planning agent response');\n}\n\nconst startIndex = rawText.indexOf('{');\nconst endIndex = rawText.lastIndexOf('}');\n\nif (startIndex === -1 || endIndex === -1) {\n  throw new Error('No JSON found in planning response');\n}\n\ntry {\n  const jsonString = rawText.substring(startIndex, endIndex + 1);\n  const parsed = JSON.parse(jsonString);\n  \n  if (!parsed.epics || !Array.isArray(parsed.epics)) {\n    throw new Error('Invalid planning output: missing epics');\n  }\n  \n  return {\n    ...parsed,\n    traceId: context.traceId,\n    sourceKey: context.requirement.key,\n    processingTime: new Date().toISOString()\n  };\n} catch (error) {\n  console.log('Failed to parse planning output:', error);\n  throw new Error(`Planning parse error: ${error}`);\n}"
+      },
+      "id": "e4894c94-9364-4a67-8336-2dd3385276a1",
+      "name": "Parse & Validate Planning",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        240,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $json.confidence_score }}",
+              "rightValue": 0.7,
+              "operator": {
+                "type": "number",
+                "operation": "smaller"
+              },
+              "id": "50244fd0-d41e-4feb-8dd2-af9e7093e293"
+            },
+            {
+              "id": "d8b806f4-b2bc-4c29-ac8b-20ced6c63a1b",
+              "leftValue": "={{ $json.confidence_score }}",
+              "rightValue": 0.9,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "98e05089-bd93-4613-880e-b614ecfcaa1a",
+      "name": "Confidence Check",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        432,
+        240
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// HITL for low confidence\nconst data = $input.first().json;\n\nreturn {\n  status: 'HITL_REQUIRED',\n  reason: 'LOW_CONFIDENCE',\n  traceId: data.traceId,\n  confidence_score: data.confidence_score,\n  message: 'Planning confidence below threshold. Human review required.',\n  planning_output: data,\n  questions: data.questions || []\n};"
+      },
+      "id": "815ef5df-0db7-4a3e-a187-ce5d265f6201",
+      "name": "HITL: Low Confidence",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        640,
+        160
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Process epics for batch Jira creation\nconst planningData = $input.first().json;\nconst epicsToCreate = [];\n\n// Store planning data for later use\nconst contextData = {\n  traceId: $('Generate TraceID').first().json.traceId,\n  sourceKey: planningData.sourceKey,\n  planningSummary: planningData.planning_summary,\n  allEpics: planningData.epics\n};\n\n// Prepare each epic for creation\nfor (const epic of planningData.epics) {\n  epicsToCreate.push({\n    summary: epic.summary,\n    description: epic.description,\n    labels: ['ai-generated', 'wf-0', `trace-${contextData.traceId}`],\n    priority: epic.priority || 'Medium',\n    businessValue: epic.business_value,\n    successCriteria: epic.success_criteria.join('\\n'),\n    // Attach full epic data for story creation later\n    _epicData: epic,\n    _context: contextData\n  });\n}\n\nconsole.log(`Prepared ${epicsToCreate.length} epics for creation`);\nreturn epicsToCreate;"
+      },
+      "id": "c3db5419-a25b-4172-8957-1175f3572d2d",
+      "name": "Prepare Epics for Creation",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "931038c8-3db1-4acd-906d-e8c04740e021",
+      "name": "Split Epics (Batch)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        832,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "project": {
+          "__rl": true,
+          "value": "12877",
+          "mode": "list",
+          "cachedResultName": "Taikoo Plus Dev"
+        },
+        "issueType": {
+          "__rl": true,
+          "value": "10834",
+          "mode": "list",
+          "cachedResultName": "Epic"
+        },
+        "summary": "={{ $json.summary }}",
+        "additionalFields": {
+          "description": "={{ $json.description }}\n\n**Success Criteria:\n{{ $json.successCriteria }}",
+          "customFieldsUi": {
+            "customFieldsValues": [
+              {
+                "fieldId": {
+                  "__rl": true,
+                  "value": "customfield_10928",
+                  "mode": "list",
+                  "cachedResultName": "Business Value (1-100)"
+                },
+                "fieldValue": "={{ $json.businessValue }}"
+              }
+            ]
+          },
+          "labels": "={{ $json.labels }}",
+          "priority": {
+            "__rl": true,
+            "value": "={{ $json.priority }}",
+            "mode": "id"
+          }
+        }
+      },
+      "id": "35502e5d-dd1a-4a04-bc21-fe5108422566",
+      "name": "Create Epic in Jira",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        1104,
+        224
+      ],
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "RgVehemDtsefy49r",
+          "name": "Tekcent Jira"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Store created epic data with original planning\nconst createdEpic = $input.first().json;\nconst originalData = $input.first().json._epicData;\nconst context = $input.first().json._context;\n\nreturn {\n  epicKey: createdEpic.key,\n  labels: createdEpic.labels,\n  priority: createdEpic.priority,\n  epicId: createdEpic.id,\n  epicSummary: createdEpic.summary,\n  originalEpicData: originalData,\n  context: context\n};"
+      },
+      "id": "04a9e516-b602-463e-b95b-b2a8de51b40b",
+      "name": "Store Created Epic",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1104,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all created epics\nconst items = $input.all();\nconst createdEpics = [];\nconst allStories = [];\n\n// Process each created epic\nfor (const item of items) {\n  const epicData = item.json;\n  createdEpics.push({\n    key: epicData.key,\n    id: epicData.id,\n    summary: epicData.epicSummary\n  });\n  \n  // Prepare user stories for this epic\n  if (epicData.originalEpicData.user_stories) {\n    for (const story of epicData.originalEpicData.user_stories) {\n      allStories.push({\n        epicId: epicData.id,\n        epicKey: epicData.key,\n        type: 'user',\n        summary: story.summary,\n        description: story.description,\n        acceptanceCriteria: story.acceptance_criteria.join('\\n'),\n        storyPoints: story.story_points,\n        priority: story.priority || 'Medium',\n        labels: ['user-story', 'ai-generated', `epic-${epicData.key}`]\n      });\n    }\n  }\n  \n  // Prepare technical stories for this epic\n  if (epicData.originalEpicData.technical_stories) {\n    for (const techStory of epicData.originalEpicData.technical_stories) {\n      const subtasks = techStory.sub_tasks\n        .map(t => `- ${t.title} (${t.estimated_hours}h)`)\n        .join('\\n');\n      \n      allStories.push({\n        epicId: epicData.id,\n        epicKey: epicData.key,\n        type: 'technical',\n        summary: `[Tech] ${techStory.summary}`,\n        description: `${techStory.description}\\n\\n**Category:** ${techStory.category}\\n**Risk Level:** ${techStory.risk_level}\\n\\n**Sub-tasks:**\\n${subtasks}`,\n        category: techStory.category,\n        riskLevel: techStory.risk_level,\n        labels: ['technical-story', techStory.category, 'ai-generated', `epic-${epicData.key}`]\n      });\n    }\n  }\n}\n\n// Return aggregated data\nreturn {\n  summary: {\n    epicsCreated: createdEpics.length,\n    totalStories: allStories.length,\n    epics: createdEpics\n  },\n  stories: allStories,\n  context: items[0].json.context\n};"
+      },
+      "id": "2667cb2a-5a02-4e73-9acd-5dca5b3e97ce",
+      "name": "Aggregate Epics & Prepare Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1008,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get all stories to create\nconst data = $input.first().json;\nconst stories = data.stories;\n\nif (!stories || stories.length === 0) {\n  return {\n    ...data,\n    storiesCreated: []\n  };\n}\n\n// Return each story as separate item for batch processing\nreturn stories;"
+      },
+      "id": "95f05552-697b-473a-b430-8e4347c7eb39",
+      "name": "Prepare Stories for Batch",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "7399ed0a-a8b1-44cf-b42b-27bb6676b710",
+      "name": "Split Stories (Batch)",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        1408,
+        576
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Aggregate all created stories\nconst items = $input.all();\n\nreturn {\n  storiesCreated: items,\n  totalStories: items.length\n};"
+      },
+      "id": "eff3a988-3efd-400d-b171-4c82af04b400",
+      "name": "Aggregate Created Stories",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1648,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare final response for webhook\nconst result = $input.first().json;\nconst timestamp = new Date().toISOString();\n\nconst response = {\n  status: 'SUCCESS',\n  traceId: result.traceId,\n  message: 'WF-0 Project Initiation completed successfully',\n  timestamp: timestamp,\n  summary: {\n    epicsCreated: $('Aggregate Epics & Prepare Stories').first().json.summary.epicsCreated,\n    storiesCreated: result.totalStories,\n    //epicsCreated: result.summary.epicsCreated,\n    //storiesCreated: result.summary.storiesCreated,\n    //documentsGenerated: result.summary.documentsGenerated\n  },\n  createdItems: {\n    epics: $('Aggregate Epics & Prepare Stories').first().json.summary.epics.map(e => ({\n      key: e.key,\n      summary: e.summary,\n      url: `https://tekcent.atlassian.net/browse/${e.key}`\n    })),\n    stories: result.storiesCreated.map(s => ({\n      key: s.json.key,\n      url: `https://tekcent.atlassian.net/browse/${s.json.key}`\n    }))\n  },\n  nextSteps: [\n    'Review created epics and stories in Jira',\n    'Validate generated documentation',\n    'Proceed with sprint planning',\n    'Trigger WF-2 when development begins'\n  ],\n  processingTime: {\n    start: $('Generate TraceID').first().json.startTime || timestamp,\n    end: timestamp\n  }\n};\n\nreturn response;"
+      },
+      "id": "2a21da6f-2b2d-4269-ad2c-cb9a53f8ecae",
+      "name": "Prepare Webhook Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1936,
+        560
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify($json) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Trace-Id",
+                "value": "={{ $json.traceId }}"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b993f2f2-485d-4f45-98c1-ec2f2d626d5c",
+      "name": "Respond to Webhook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [
+        2208,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 1
+          },
+          "conditions": [
+            {
+              "id": "745a1eb0-96b4-4e3d-beac-6dcfe53f3230",
+              "leftValue": "={{ $json.isDuplicate }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "id": "ef6a7ecb-6986-4779-888a-7eb4a93021aa",
+      "name": "Is Duplicate?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -528,
+        160
+      ],
+      "notesInFlow": false,
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineAll",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1360,
+        320
+      ],
+      "id": "f0c21b97-bd77-4cb6-983f-ec90f2d2fed2",
+      "name": "Merge"
+    },
+    {
+      "parameters": {
+        "project": {
+          "__rl": true,
+          "value": "12877",
+          "mode": "list",
+          "cachedResultName": "Taikoo Plus Dev"
+        },
+        "issueType": {
+          "__rl": true,
+          "value": "10961",
+          "mode": "list",
+          "cachedResultName": "Story"
+        },
+        "summary": "={{ $json.summary }}",
+        "additionalFields": {
+          "description": "={{ $json.description }}\\n\\n**Acceptance Criteria:**\\n{{ $json.acceptanceCriteria }}",
+          "customFieldsUi": {
+            "customFieldsValues": [
+              {
+                "fieldId": {
+                  "__rl": true,
+                  "value": "customfield_10803",
+                  "mode": "list",
+                  "cachedResultName": "Story point estimate"
+                },
+                "fieldValue": "={{ $json.storyPoints }}"
+              }
+            ]
+          },
+          "labels": "={{ $json.labels }}",
+          "parentIssueKey": "={{ $json.epicKey }}",
+          "priority": {
+            "__rl": true,
+            "value": "={{ $json.priority }}",
+            "mode": "id"
+          }
+        }
+      },
+      "id": "9b5ec161-ff23-40c0-91da-c48eb1da2586",
+      "name": "Create User Story in Jira",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        736
+      ],
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "RgVehemDtsefy49r",
+          "name": "Tekcent Jira"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "project": {
+          "__rl": true,
+          "value": "12877",
+          "mode": "list",
+          "cachedResultName": "Taikoo Plus Dev"
+        },
+        "issueType": {
+          "__rl": true,
+          "value": "10961",
+          "mode": "list",
+          "cachedResultName": "Story"
+        },
+        "summary": "={{ $json.summary }}",
+        "additionalFields": {
+          "description": "={{ $json.description }}",
+          "labels": "={{ $json.labels }}",
+          "parentIssueKey": "={{ $json.epicKey }}"
+        }
+      },
+      "id": "742ec138-2436-457d-bc62-f082454514bd",
+      "name": "Create Tech Story in Jira",
+      "type": "n8n-nodes-base.jira",
+      "typeVersion": 1,
+      "position": [
+        1840,
+        944
+      ],
+      "credentials": {
+        "jiraSoftwareCloudApi": {
+          "id": "RgVehemDtsefy49r",
+          "name": "Tekcent Jira"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "085b81ea-b94a-4c8c-9db9-bbc81cb05aac",
+              "leftValue": "={{ $json.type }}",
+              "rightValue": "user",
+              "operator": {
+                "type": "string",
+                "operation": "equals",
+                "name": "filter.operator.equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1584,
+        736
+      ],
+      "id": "b20b3bab-9f37-4ef6-ba02-6f12979d5e54",
+      "name": "User Story/Tech Story?"
+    }
+  ],
+  "connections": {
+    "Webhook Trigger": {
+      "main": [
+        [
+          {
+            "node": "Generate TraceID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Generate TraceID": {
+      "main": [
+        [
+          {
+            "node": "Fetch Source Content",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Source Content": {
+      "main": [
+        [
+          {
+            "node": "Fetch Existing Epics",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Fetch Existing Epics": {
+      "main": [
+        [
+          {
+            "node": "Prepare Duplicate Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Duplicate Context": {
+      "main": [
+        [
+          {
+            "node": "AI: Duplicate Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI: Duplicate Check": {
+      "main": [
+        [
+          {
+            "node": "Parse Duplicate Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model (Duplicate)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI: Duplicate Check",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Duplicate Check": {
+      "main": [
+        [
+          {
+            "node": "Is Duplicate?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HITL: Duplicate Notification": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Planning Context": {
+      "main": [
+        [
+          {
+            "node": "🎯 Combined Planning Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "🎯 Combined Planning Agent": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Planning",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini Model (Planning)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "🎯 Combined Planning Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Planning": {
+      "main": [
+        [
+          {
+            "node": "Confidence Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Confidence Check": {
+      "main": [
+        [
+          {
+            "node": "Prepare Epics for Creation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HITL: Low Confidence",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HITL: Low Confidence": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Epics for Creation": {
+      "main": [
+        [
+          {
+            "node": "Split Epics (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Epics (Batch)": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Epics & Prepare Stories",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Epic in Jira",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Store Created Epic",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Epic in Jira": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Store Created Epic": {
+      "main": [
+        [
+          {
+            "node": "Merge",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Aggregate Epics & Prepare Stories": {
+      "main": [
+        [
+          {
+            "node": "Prepare Stories for Batch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Stories for Batch": {
+      "main": [
+        [
+          {
+            "node": "Split Stories (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Split Stories (Batch)": {
+      "main": [
+        [
+          {
+            "node": "Aggregate Created Stories",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "User Story/Tech Story?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate Created Stories": {
+      "main": [
+        [
+          {
+            "node": "Prepare Webhook Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Webhook Response": {
+      "main": [
+        [
+          {
+            "node": "Respond to Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Is Duplicate?": {
+      "main": [
+        [
+          {
+            "node": "HITL: Duplicate Notification",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Planning Context",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge": {
+      "main": [
+        [
+          {
+            "node": "Split Epics (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create User Story in Jira": {
+      "main": [
+        [
+          {
+            "node": "Split Stories (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Tech Story in Jira": {
+      "main": [
+        [
+          {
+            "node": "Split Stories (Batch)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "User Story/Tech Story?": {
+      "main": [
+        [
+          {
+            "node": "Create User Story in Jira",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Tech Story in Jira",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "2756a8c1e4c07f5d310614fd28773cc5c5a5b977f577da9a35a5036f4333eec2"
+  }
+}
