@@ -1,0 +1,1 @@
+<%@ Application Codebehind="Global.asax.cs" Inherits="Project.TekcentDemo.Website.Global" Language="C#" %>

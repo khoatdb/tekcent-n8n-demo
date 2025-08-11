@@ -1,0 +1,16 @@
+{
+  "$schema": "https://raw.githubusercontent.com/Sitecore/Sitecore-CLI/main/schemas/RootConfigurationFile.schema.json",
+  "modules": [
+    "src/Project/TekcentDemo/serialization/TekcentDemo.module.json",
+    "src/Feature/*/serialization/*.module.json",
+    "src/Foundation/*/serialization/*.module.json"
+  ],
+  "serialization": {
+    "defaultMaxRelativeItemPathLength": 100,
+    "defaultModuleRelativeSerializationPath": "serialization",
+    "removeOrphansForRoles": true,
+    "removeOrphansForUsers": true,
+    "continueOnItemFailure": false
+  },
+  "defaultEnvironment": "default"
+}
