@@ -45,7 +45,56 @@ git clone <repository-url>
 cd tekcent-n8n-demo
 ```
 
-### 2. Restore NuGet Packages
+### 2. Validate Solution Structure
+
+First, validate that the solution is properly structured:
+
+```bash
+# On Linux/Mac
+bash scripts/validate.sh
+
+# On Windows
+scripts\validate.sh
+```
+
+### 3. Windows Build Validation
+
+For comprehensive build validation on Windows, use the provided validation scripts:
+
+#### Option 1: PowerShell Validation (Recommended)
+```powershell
+# Run comprehensive build validation
+.\build\validate-build.ps1
+
+# Skip package restore (if packages already restored)  
+.\build\validate-build.ps1 -SkipRestore
+
+# Test Release configuration
+.\build\validate-build.ps1 -Configuration Release
+```
+
+#### Option 2: Batch File Validation
+```cmd
+# Run complete build validation
+.\build\validate-build.bat
+```
+
+#### Option 3: MSBuild Direct Testing
+```cmd
+# Find MSBuild and test compilation
+.\build\build.bat
+```
+
+The validation scripts will:
+- ✅ Verify .NET Framework 4.8 availability
+- ✅ Locate MSBuild (VS 2019/2022)
+- ✅ Validate project structure and target frameworks
+- ✅ Check NuGet package configurations  
+- ✅ Test package restore process
+- ✅ Attempt compilation in Debug/Release modes
+- ✅ Verify assembly output and dependencies
+
+### 4. Restore NuGet Packages
 
 ```bash
 nuget restore TekcentDemo.sln
