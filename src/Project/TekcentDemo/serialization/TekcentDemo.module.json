@@ -1,0 +1,32 @@
+{
+  "namespace": "TekcentDemo",
+  "items": {
+    "includes": [
+      {
+        "name": "content",
+        "path": "/sitecore/content/TekcentDemo",
+        "allowedPushOperations": "CreateUpdateAndDelete"
+      },
+      {
+        "name": "templates", 
+        "path": "/sitecore/templates/Project/TekcentDemo",
+        "allowedPushOperations": "CreateUpdateAndDelete"
+      },
+      {
+        "name": "layouts",
+        "path": "/sitecore/layout/Layouts/Project/TekcentDemo", 
+        "allowedPushOperations": "CreateUpdateAndDelete"
+      },
+      {
+        "name": "renderings",
+        "path": "/sitecore/layout/Renderings/Project/TekcentDemo",
+        "allowedPushOperations": "CreateUpdateAndDelete" 
+      },
+      {
+        "name": "media",
+        "path": "/sitecore/media library/Project/TekcentDemo",
+        "allowedPushOperations": "CreateUpdateAndDelete"
+      }
+    ]
+  }
+}
