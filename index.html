@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tekcent - Engineering Digital Experiences with AI & Web3</title>
+    <meta name="description" content="We leverage customer experience design, technology and innovation to power smarter ways of working and connecting with your customers.">
+    <link rel="stylesheet" href="styles/main.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Header Navigation Component -->
+    <header class="header" role="banner">
+        <nav class="nav" role="navigation" aria-label="Main navigation">
+            <div class="nav-container">
+                <!-- Logo -->
+                <div class="nav-brand">
+                    <a href="/" class="brand-link" aria-label="Tekcent Home">
+                        <svg class="brand-logo" width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <rect width="40" height="40" rx="8" fill="white"/>
+                            <path d="M12 12V16H16V12H20V28H16V24H12V28H8V12H12Z" fill="#1E293B"/>
+                            <path d="M24 12H32V16H28V28H24V12Z" fill="#1E293B"/>
+                        </svg>
+                        <span class="brand-text">Tekcent</span>
+                    </a>
+                </div>
+
+                <!-- Main Navigation -->
+                <ul class="nav-menu" role="menubar">
+                    <li class="nav-item" role="none">
+                        <a href="/services" class="nav-link" role="menuitem">Services</a>
+                    </li>
+                    <li class="nav-item" role="none">
+                        <a href="/work" class="nav-link" role="menuitem">Our work</a>
+                    </li>
+                    <li class="nav-item nav-item--dropdown" role="none">
+                        <button class="nav-link nav-link--dropdown" 
+                                role="menuitem" 
+                                aria-haspopup="true" 
+                                aria-expanded="false"
+                                id="insights-menu-button">
+                            Insights
+                            <svg class="dropdown-icon" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                                <path d="M4 6L8 10L12 6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <!-- Insights Dropdown -->
+                        <div class="dropdown-menu" role="menu" aria-labelledby="insights-menu-button">
+                            <div class="dropdown-content">
+                                <div class="dropdown-header">
+                                    <h3>Insights</h3>
+                                    <p>Access the latest research, analysis and best practices to accelerate your business goals.</p>
+                                </div>
+                                <div class="dropdown-featured">
+                                    <div class="featured-award">
+                                        <div class="award-badge">
+                                            <span class="award-text">SITECORE Experience Award 2023</span>
+                                        </div>
+                                        <p class="award-description">Tekcent recognized with a 2023 Sitecore experience award honoring member...</p>
+                                    </div>
+                                </div>
+                                <div class="dropdown-links">
+                                    <a href="/insights/byos" class="dropdown-link">BYOS: Your business, your services, your way</a>
+                                    <a href="/insights/zero-trust" class="dropdown-link">What is Zero Trust and Why You Need It</a>
+                                    <a href="/insights/code-quality" class="dropdown-link">How to Choose the Right Tool for Your Code Quality and Security: SonarCloud vs SonarQube</a>
+                                    <a href="/insights" class="dropdown-link dropdown-link--all">All Insights</a>
+                                </div>
+                            </div>
+                        </div>
+                    </li>
+                    <li class="nav-item" role="none">
+                        <a href="/about" class="nav-link" role="menuitem">About Us</a>
+                    </li>
+                </ul>
+
+                <!-- CTA Button -->
+                <div class="nav-cta">
+                    <a href="/contact" class="cta-button">
+                        Get in touch
+                        <svg class="cta-arrow" width="16" height="16" viewBox="0 0 16 16" fill="none">
+                            <path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                    </a>
+                </div>
+
+                <!-- Mobile Menu Toggle -->
+                <button class="mobile-menu-toggle" aria-label="Toggle navigation menu" aria-expanded="false">
+                    <span class="hamburger-line"></span>
+                    <span class="hamburger-line"></span>
+                    <span class="hamburger-line"></span>
+                </button>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Main Content Area -->
+    <main class="main-content">
+        <section class="hero">
+            <div class="hero-container">
+                <h1 class="hero-title">
+                    Engineering<br>
+                    digital<br>
+                    experiences<br>
+                    with AI & Web3
+                </h1>
+                <p class="hero-description">
+                    We leverage customer experience design, technology and innovation to power smarter ways of working and connecting with your customers.
+                </p>
+                <button class="hero-cta">
+                    Find out more
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                        <path d="M6 12L10 8L6 4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <script src="scripts/header-navigation.js"></script>
+</body>
+</html>
